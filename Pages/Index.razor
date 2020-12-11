@@ -1,0 +1,10 @@
+@page "/"
+
+<AuthorizeView>
+    <Authorized>
+        <AccountComponent></AccountComponent>
+    </Authorized>
+    <NotAuthorized>
+        <Login></Login>
+    </NotAuthorized>
+</AuthorizeView>

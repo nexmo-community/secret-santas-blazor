@@ -1,0 +1,118 @@
+﻿@inject SecretSantaContext Db
+@inject AuthenticationStateProvider Provider
+@inject NavigationManager NavigationManager
+@inject SecretSantaService SecretSantaService
+@using System.Security.Claims
+<h3>Accounts</h3>
+<table class="table-bordered">
+    <tr>
+        <th>Your Name</th>
+        <td>@participant.Name</td>
+    </tr>
+    <tr>
+        <th>Your Address</th>
+        <td><input class="input-group" @bind="participant.Address" /></td>
+    </tr>
+    <tr>
+        <th>Gift Ideas For You</th>
+        <td><input class="input-group" @bind="participant.GiftIdeas" /></td>
+    </tr>
+    @if (participant.Match != null)
+    {
+        <tr>
+            <th>Your Secret Santa</th>
+            <td>@participant.Match.Name</td>
+        </tr>
+        <tr>
+            <th>Gift Ideas</th>
+            <td>@participant.Match.GiftIdeas</td>
+        </tr>
+        <tr>
+            <th>Your Secret Santa's Address</th>
+            <td>@participant.Match.Address</td>
+        </tr>
+    }
+    else
+    {
+        <tr>
+            <th>Status</th>
+            <td>Pending match</td>
+        </tr>
+    }
+</table>
+@if (_isAdmin)
+{
+    <h3>Admin Section</h3>
+    <table class="table-bordered">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Phone Number</th>
+                <th>Address</th>
+                <th>Gift ideas</th>
+                <th>Matched?</th>
+            </tr>
+        </thead>
+        @foreach (var par in _participants)
+        {
+            <tr>
+                <td>@par.Name</td>
+                <td>@par.PhoneNumber</td>
+                <td>@par.Address</td>
+                <td>@par.GiftIdeas</td>
+                <td>@(par.Match!=null)</td>
+            </tr>
+        }
+    </table>
+    <button @onclick="Shuffle" class="btn-group-lg">Shuffle And Send</button>
+    <button @onclick="SecretSantaService.NotifyUsers">Notify Participants</button>
+    <br />
+}
+<p>@msg</p>
+<button style="cursor:pointer" @onclick="UpdateAccount">Update Account</button>
+<a @onclick="Logout" href="">Log Out</a>
+
+@code {
+    SecretSantaParticipant participant = new SecretSantaParticipant();
+    List<SecretSantaParticipant> _participants = new List<SecretSantaParticipant>();
+    string msg;
+    bool _isAdmin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var user = (await ((AuthProvider)Provider).GetAuthenticationStateAsync()).User.Claims.First(x => x.Type == ClaimTypes.Name).Value;
+        participant = Db.Participants.ToList().FirstOrDefault(x => x.PhoneNumber == user);
+        _isAdmin = participant.Role == "admin";
+        if (_isAdmin)
+        {
+            _participants = Db.Participants.ToList();
+        }
+        StateHasChanged();
+    }
+
+    private async void Shuffle()
+    {
+        await SecretSantaService.ShuffleUsers();
+    }
+
+    private void Logout()
+    {
+        ((AuthProvider)Provider).LogOutUser();
+
+    }
+    private async void UpdateAccount()
+    {
+        var par = Db.Participants.FirstOrDefault(x => x.PhoneNumber == participant.PhoneNumber);
+        par = participant;
+
+        await Db.SaveChangesAsync();
+        msg = "Account Updated";
+
+        try
+        {
+            await SecretSantaService.NotifyUserOfUpdate(par);
+        }
+        catch (Exception ex) { msg = ex.Message; }
+        StateHasChanged();
+    }
+}

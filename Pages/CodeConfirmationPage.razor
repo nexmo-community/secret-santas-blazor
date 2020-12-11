@@ -1,0 +1,34 @@
+﻿@using Microsoft.AspNetCore.Identity
+@inject SecretSantaService VonageService
+@inject SecretSantaContext db
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider Provider
+
+@page "/confirmCode/{VerifyRequestId}"
+
+<h3>Confirm Code!</h3>
+<input class="input-group-text" @bind="_code" />
+<button class="btn-group-lg" @onclick="CheckCode">Confirm</button>
+
+@if (_authenticated == false)
+{
+    <p>Authentication Successful</p>
+}
+
+@code {
+    [Parameter]
+    public string VerifyRequestId { get; set; }
+    private string _code;
+    private bool? _authenticated;
+
+    private async Task CheckCode()
+    {
+        _authenticated = await VonageService.ConfirmCode(VerifyRequestId, _code);
+        if (_authenticated == true)
+        {
+            var user = db.Participants.Where(x => x.RequestId == VerifyRequestId).FirstOrDefault();
+            ((AuthProvider)Provider).AuthorizeUser(user);
+            NavigationManager.NavigateTo("/");
+        }
+    }
+}

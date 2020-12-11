@@ -1,0 +1,50 @@
+﻿@inject SecretSantaService SecretSantaService
+@inject SecretSantaContext Database
+@inject NavigationManager NavigationManager
+@using Vonage.Verify
+<h3>Login</h3>
+Phone Number:
+<input class="input-group-text" @bind="_phoneNumber" />
+<button class="btn-group-sm" @onclick="StartLogin">Login</button>
+<br />
+@if (_numberExists == false)
+{
+    <p1>Nubmer Not Registered</p1>
+    <br />
+}
+<a href="/registration">Register here</a>
+
+@code {
+    private string _phoneNumber;
+    private bool? _numberExists;
+
+    private async Task StartLogin()
+    {
+        if (!_phoneNumber.StartsWith("1"))
+        {
+            _phoneNumber = "1" + _phoneNumber;
+        }
+        var user = Database.Participants.Where(x => x.PhoneNumber == _phoneNumber).FirstOrDefault();
+        if (user != null)
+        {
+            try
+            {
+                var verifyId = await SecretSantaService.StartVeriy(_phoneNumber);
+                user.RequestId = verifyId;
+                await Database.SaveChangesAsync();
+                NavigationManager.NavigateTo($"/confirmCode/{verifyId}");
+            }
+            catch (VonageVerifyResponseException ex)
+            {
+                if (ex.Response.Status == "10")
+                {
+                    NavigationManager.NavigateTo($"/confirmCode/{user.RequestId}");
+                }
+            }
+        }
+        else
+        {
+            _numberExists = false;
+        }
+    }
+}

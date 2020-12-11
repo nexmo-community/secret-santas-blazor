@@ -1,0 +1,78 @@
+﻿@inject SecretSantaContext dbContext;
+@inject SecretSantaService SecretSantaService
+@inject NavigationManager NavigationManager
+@inject Microsoft.Extensions.Configuration.IConfiguration Config 
+@using Vonage.Verify
+@page "/registration"
+<h3>Register</h3>
+
+<div class="row">
+    <div class="col-md-4">
+        <EditForm Model="@participant" OnValidSubmit="CreateUser">
+            <DataAnnotationsValidator />
+            <ValidationSummary />
+            Your Phone Number*:<br /><InputText id="phone" @bind-Value="participant.PhoneNumber" /><br />
+            Your Name*:<br /><InputText id="Name" @bind-Value="participant.Name" /><br />
+            Your Mailing Address*:<br /><InputText id="Address" @bind-Value="participant.Address" /><br />
+            Gift ideas (For You!):<br /><InputText id="GiftIdeas" @bind-Value="participant.GiftIdeas" /><br />
+            <button type="submit">Register</button>
+            <p>*Required fields</p>
+        </EditForm>
+    </div>
+</div>
+@if (_userExistsAlready == true)
+{
+    <p>User exists already try <a href="/">logging in</a></p>
+}
+@if (!string.IsNullOrEmpty(_error))
+{
+    <p><b>Error Encountered:</b> @_error</p>
+}
+
+@code {
+    private SecretSantaParticipant participant = new SecretSantaParticipant();
+    private bool? _userExistsAlready;
+    private string _error = "";
+    private async Task CreateUser()
+    {
+        participant.PhoneNumber = participant.PhoneNumber.Replace("(", "");
+        participant.PhoneNumber = participant.PhoneNumber.Replace(")", "");
+        participant.PhoneNumber = participant.PhoneNumber.Replace("-", "");
+
+        if (!participant.PhoneNumber.StartsWith("1"))
+        {
+            participant.PhoneNumber = "1" + participant.PhoneNumber;
+        }
+        var userExists = dbContext.Participants.Where(x => x.PhoneNumber == participant.PhoneNumber).Any();
+        if (!userExists)
+        {
+
+            try
+            {
+                if (participant.PhoneNumber == Config["ADMIN_NUMBER"])
+                {
+                    participant.Role = "admin";
+                }
+                else
+                {
+                    participant.Role = "user";
+                }
+
+                var verifyRequestId = await SecretSantaService.StartVeriy(participant.PhoneNumber);
+                participant.RequestId = verifyRequestId;
+                dbContext.Participants.Add(participant);
+                dbContext.SaveChanges();
+                NavigationManager.NavigateTo($"/confirmCode/{verifyRequestId}");
+            }
+            catch (VonageVerifyResponseException ex)
+            {
+                _error = ex.Response.ErrorText;
+            }
+        }
+        else
+        {
+            _userExistsAlready = true;
+        }
+
+    }
+}
